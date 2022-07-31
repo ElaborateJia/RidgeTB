@@ -1,0 +1,962 @@
+---
+title: "Summary"
+author: "Shen JIA"
+date: "6/8/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+install.packages('randomcoloR')
+library(randomcoloR)
+library(Rtsne)
+```
+
+```{r}
+install.packages('gelman.diag')
+library(gelman.diag)
+```
+
+
+```{r}
+library(tidyverse)
+library(Rlab)
+library(devtools)
+library(splitstackshape)
+library(MASS)
+library(LaplacesDemon)
+library(rstan)
+library(rstanarm)
+library(bayesreg)
+```
+
+```{r}
+install.packages('extraDistr')
+library('extraDistr')
+```
+
+
+```{r}
+source("/Users/shenjia/Desktop/Mphil dissertation/Ridge_TB/R/metrop.R")
+source("/Users/shenjia/Desktop/Mphil dissertation/Ridge_TB/R/data.R")
+source("/Users/shenjia/Desktop/Mphil dissertation/Ridge_TB/R/likelihood.R")
+source("/Users/shenjia/Desktop/Mphil dissertation/Ridge_TB/R/prior_posterior_proposal.R")
+source("/Users/shenjia/Desktop/Mphil dissertation/Ridge_TB/R/TailoredBayes.R")
+source("/Users/shenjia/Desktop/Mphil dissertation/Ridge_TB/R/weights_construction.R")
+source("/Users/shenjia/Desktop/Mphil dissertation/Ridge_TB/R/CV.R")
+source("/Users/shenjia/Desktop/Mphil dissertation/Ridge_TB/R/posterior_predictive.R")
+source("/Users/shenjia/Desktop/Mphil dissertation/Ridge_TB/R/NB_treated.R")
+# source('/Users/shenjia/Desktop/Mphil dissertation/Ridge_TB/R/Data_Simulation.R')
+```
+
+
+Data simulation
+```{r}
+load(file = 'design_data.Rdata') # .Rdata object
+# data_train
+load(file = 'train_data.Rdata') # .Rdata object
+```
+
+
+Data splitting & pre-fitting 
+```{r}
+pre_fit_glm <- glm(y ~ ., family = binomial("logit"),data =  data_design_d1)
+pred_glm <- predict(pre_fit_glm, newdata = data_train_d1 ,type = "response")
+```
+
+
+```{r}
+g1<- rep(0.1,10)
+g2 <-rep(0,50)
+sv <- c(g1,g2)
+sv_ <-c(0,sv,0.1)
+```
+
+
+
+
+The result of model from bayesreg (used to compare the lambda)
+```{r}
+pre_fit_01 <- bayesreg(y ~ ., model = "logistic", prior = "ridge", data = simulate_D1,n.samples = 10000,burnin = 4000)
+
+```
+
+```{r}
+pre_fit_02 <- bayesreg(y ~ ., model = "logistic", prior = "ridge", data = simulate_D1,n.samples = 10000,burnin = 4000)
+```
+
+
+
+```{r}
+fit_tailor_d1_SB <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 0,  pi_u = pred_glm , t = 0.5,user_prior_density = ridge_prior)
+```
+
+```{r}
+fit_tailor_d1_SBv2 <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 0,  pi_u = pred_glm , t = 0.5,user_prior_density = ridge_prior)
+```
+
+```{r}
+fit_tailor_d1_SBv3 <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 0,  pi_u = pred_glm , t = 0.5,user_prior_density = ridge_prior)
+```
+
+```{r}
+fit_tailor_d1_SB5 <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 0,  pi_u = pred_glm , t = 0.5,user_prior_density = ridge_prior,initial = sv_)
+```
+
+
+
+```{r}
+fit_tailor_d1_SB2 <- metrop_tailor(y~.,data =  data_train_d1, lambda = 0,  pi_u = pred_glm , t = 0.5,user_prior_density = ridge_prior, initial = rep(0.5,62))
+```
+
+```{r}
+fit_tailor_d1_SB3 <- metrop_tailor(y~.,data =  data_train_d1, lambda = 0,  pi_u = pred_glm , t = 0.5,user_prior_density = ridge_prior, initial = rep(0.2,62))
+```
+
+```{r}
+fit_tailor_d1_SB4 <- metrop_tailor(y~.,data =  data_train_d1, lambda = 0,  pi_u = pred_glm , t = 0.5,user_prior_density = ridge_prior, initial = rep(0.1,62))
+```
+
+
+
+```{r}
+min(min(fit_tailor_d1_SB$chain[3001:10000,1],fit_tailor_d1_SB2$chain[3001:10000,1]),fit_tailor_d1_SB3$chain[3001:10000,1])
+```
+
+
+
+```{r}
+pdf(file = "/Users/shenjia/Desktop/Mphil dissertation/coefficient_initial.pdf", onefile = TRUE)
+par(mfrow = c(2, 3))
+for (i in 1:62){
+    plot(density(fit_tailor_d1_SB$chain[5001:15000,i]),main = paste('coefficient', i),col = 'red',xlab = '',xlim = c(min(min(fit_tailor_d1_SB$chain[5001:15000,i],fit_tailor_d1_SB2$chain[5001:15000,i]),min(fit_tailor_d1_SB3$chain[5001:15000,i],fit_tailor_d1_SB4$chain[5001:15000,i])),max(max(fit_tailor_d1_SB$chain[5001:15000,i],fit_tailor_d1_SB2$chain[5001:15000,i]),max(fit_tailor_d1_SB3$chain[5001:15000,i],fit_tailor_d1_SB4$chain[5001:15000,i])) ))
+    lines(density(fit_tailor_d1_SB2$chain[5001:15000,i]), col = 'blue')
+    lines(density(fit_tailor_d1_SB3$chain[5001:15000,i]), col = 'black')
+    lines(density(fit_tailor_d1_SB4$chain[5001:15000,i]), col = 'green')
+
+}
+dev.off()
+```
+
+
+```{r}
+par(mfrow = c(2, 3))
+for (i in 1:60){
+    plot(density(pre_fit_01$beta[i,]),main = paste('coefficient', i),col = 'red',xlab = '',xlim = c(min(pre_fit_02$beta[i,],pre_fit_01$beta[i,]),max(pre_fit_02$beta[i,],pre_fit_01$beta[i,])) )
+    lines(density(pre_fit_02$beta[i,]), col = 'blue')
+
+}
+```
+
+```{r}
+
+
+```
+
+$$
+\lambda_{ridge}
+$$
+
+
+
+
+```{r}
+png(filename = 'Posterior distribution of lambda ridge and tau2.png',res = 200, width =  1200, height = 800)
+plot(density(pre_fit_01$tau2^(-1)),main = 'Posterior distribution of lambda ridge and tau2',col = 'red',xlab = '',xlim = c(min(exp(fit_tailor_d1_SB$chain[40001:100000,62]),pre_fit_01$tau2^(-1)),max(exp(fit_tailor_d1_SB$chain[40001:100000,62]),pre_fit_01$tau2^(-1))),
+    ylim  = c(min(min(density(fit_tailor_d1_SB$chain[40001:100000,62])$y),min(density(pre_fit_01$tau2^(-1))$y)),max(max(density(fit_tailor_d1_SB$chain[40001:100000,62])$y),max(density(pre_fit_01$tau2^(-1))$y)))
+         )
+    lines(density(exp(fit_tailor_d1_SB$chain[40001:100000,62])), col = 'blue')
+legend(2.4,250,legend = c('tau2^(-1)','lambda_ridge'),col = c('red','blue'),cex = 0.7,lty=1, bty = 'n')
+dev.off()
+```
+
+
+
+
+```{r}
+# pdf(file = "/Users/shenjia/Desktop/Mphil dissertation/coefficient_100k_5kD.pdf", onefile = TRUE)
+par(mfrow = c(2, 3))
+for (i in 1:60){
+    plot(density(fit_tailor_d1_SB$chain[40001:100000,i+1]),main = paste('coefficient', i),col = 'red',xlab = '',xlim = c(min(fit_tailor_d1_SB$chain[40001:100000,i+1],pre_fit_01$beta[i,]),max(fit_tailor_d1_SB$chain[40001:100000,i+1],pre_fit_01$beta[i,])) )
+    lines(density(pre_fit_01$beta[i,]), col = 'blue')
+
+}
+# dev.off()
+```
+
+
+```{r}
+# pdf(file = "/Users/shenjia/Desktop/Mphil dissertation/tau&lambda2.pdf", onefile = TRUE)
+plot(density(exp(fit_tailor_d1_SB$chain[40001:100000,62])),main = 'tau^(-1) and lambda',col = 'red',xlab = '',xlim = c(min((exp(fit_tailor_d1_SB$chain[40001:100000,62])),pre_fit_01$tau2^(-1)),max((exp(fit_tailor_d1_SB$chain[40001:100000,62])),pre_fit_01$tau2^(-1))),
+     ylim = )
+lines(density(pre_fit_01$tau2^(-1)), col = 'blue')
+legend(2.6,1.5,legend = c('lambda','tau^(-1)'),col = c('red','blue'),cex = 0.7,lty=1)
+# dev.off()
+```
+
+
+
+```{r}
+# pdf(file = "/Users/shenjia/Desktop/Mphil dissertation/coefficient_100kdoublechain.pdf", onefile = TRUE)
+par(mfrow = c(2, 3))
+for (i in 0:61){
+    plot(density(fit_tailor_d1_SB$chain[40001:100000,i+1]),main = paste('coefficient', i),col = 'red',xlab = '',xlim = c(min(fit_tailor_d1_SB$chain[40001:100000,i+1],fit_tailor_d1_SBv2$chain[40001:100000,i+1]),max(fit_tailor_d1_SB$chain[40001:100000,i+1],fit_tailor_d1_SBv2$chain[40001:100000,i+1])) )
+    lines(density(fit_tailor_d1_SBv2$chain[40001:100000,i+1]), col = 'blue')
+
+}
+# dev.off()
+```
+
+
+
+```{r}
+summary(fit_tailor_d1_SB$chain)
+summary(fit_tailor_d1_SB2$chain)
+summary(fit_tailor_d1_SB3$chain)
+summary(fit_tailor_d1_SB4$chain)
+```
+
+```{r}
+fit_tailor_d1_SB$accept
+fit_tailor_d1_SB2$accept
+fit_tailor_d1_SB3$accept
+fit_tailor_d1_SB4$accept
+```
+
+
+```{r}
+par(mfrow = c(1, 2))
+plot(density(fit_tailor_d1_SB$chain[,1]),main = 'coefficient for the intercept',col = 'red')
+lines(density(pre_fit_01$beta0),col = 'blue')
+
+plot(density(pre_fit_01$tau2 ^ (-1/2)),main = 'coefficient for the shrinkage parameter',col = 'blue')
+lines(density(exp(fit_tailor_d1_SB$chain[,62])),col = 'red')
+
+```
+
+
+```{r}
+pdf(file = "/Users/shenjia/Desktop/Mphil dissertation/coefficient_lowdimension.pdf", onefile = TRUE)
+par(mfrow = c(1, 3))
+for (i in 1:2){
+    plot(density(fit_tailor$chain[,i+1]),main = paste('coefficient', i),col = 'red',xlab = '')
+    lines(density(fit_2d$beta[i,]), col = 'blue')
+
+}
+dev.off()
+```
+
+
+
+
+i) for t= 0.1
+ using the cv choose the best lambda
+```{r}
+# t_01_d1_v2 <- NULL
+for (lambda in seq(9,30,3)){
+    fit_result <- CV_function_loss_ADAPT_nb(5, data_train_d1, 0, 0, lambda, 0.1, 20000, 20000, 100000,pretrain = pre_fit_glm)
+    t_01_d1_v2 <-append(t_01_d1_v2,mean(fit_result$errors[,4]))
+    print('loop')
+}
+```
+
+Lambda = 6 maximize the net benefit and compare with lambda = 0 which is the standard bayes
+```{r}
+fit_tailor_d1 <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 3,  pi_u = pred_glm , t = 0.1,user_prior_density = ridge_prior)
+fit_tailor_d_SB <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 0,  pi_u = pred_glm , t = 0.1,user_prior_density = ridge_prior)
+```
+```{r}
+burnin <- 20000
+warm_up <- 20000
+```
+
+
+
+
+Result from the tb model (both TB and SB)
+```{r}
+predict_d1 <- probs.Solon(fit_tailor_d1$chain[-c(1:(burnin + warm_up)),], simulate_D1_v2[,-61], fun = mean)
+predict_d_SB <- probs.Solon(fit_tailor_d_SB$chain[-c(1:(burnin + warm_up)),], simulate_D1_v2[,-61], fun = mean)
+NB_01_TB <- net_benefit_treated(predict_d1, obs_y = simulate_D1_t[,61], risk_threshold = 0.1)
+NB_01_SB <- net_benefit_treated(predict_d_SB, obs_y = simulate_D1_t[,61], risk_threshold = 0.1)
+NB_01_TB
+NB_01_SB
+```
+
+Result from Bayesreg
+```{r}
+predict_01_BR <-predict(pre_fit_01,simulate_D1_t[,-61],type = 'response')
+NB_01_BR <- net_benefit_treated(predict_01_BR, obs_y = simulate_D1_t[,61], risk_threshold = 0.1)
+```
+
+
+
+ii)
+for t =0.3
+using the cv choose the best lambda
+```{r}
+t_03_d1 <- NULL
+for (lambda in seq(0,24,3)){
+    fit_result <- CV_function_loss_ADAPT_nb(5, data_train_d1, 0, 0, lambda, 0.3, 1000, 1000, 5000,pretrain = pre_fit_glm)
+    t_03_d1 <-append(t_03_d1,mean(fit_result$errors[,4]))
+}
+```
+
+```{r}
+pred_fit <- predict(pre_fit_glm, newdata = data_train_d1 ,type = "response")
+```
+
+```{r}
+fit_tailor_d3v2 <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 30,  pi_u = pred_glm , t = 0.3,user_prior_density = ridge_prior)
+```
+
+
+fit the model with the best lambda
+```{r}
+fit_tailor_d3 <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 12,  pi_u = pred_glm , t = 0.3,user_prior_density = ridge_prior)
+fit_tailor_d3_SB <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 0,  pi_u = pred_glm , t = 0.3,user_prior_density = ridge_prior)
+```
+
+get the result
+```{r}
+burnin <- 20000
+warm_up <- 20000
+predict_d3 <- probs.Solon(fit_tailor_d3v2$chain[-c(1:(burnin + warm_up)),], simulate_D1_v2[,-61], fun = mean)
+predict_d3_SB <- probs.Solon(fit_tailor_d3_SB$chain[-c(1:(burnin + warm_up)),], simulate_D1_v2[,-61], fun = mean)
+NB_03_TB <- net_benefit_treated(predict_d3, obs_y = simulate_D1_v2[,61], risk_threshold = 0.3)
+NB_03_SB <- net_benefit_treated(predict_d3_SB, obs_y = simulate_D1_v2[,61], risk_threshold = 0.3)
+NB_03_TB
+NB_03_SB
+```
+
+
+iii) t = 0.5
+
+```{r}
+t_05_d1 <- NULL
+for (lambda in seq(3,30,3)){
+    fit_result <- CV_function_loss_ADAPT_nb(5, data_train_d1, 0, 0, lambda, 0.5, 1000, 1000, 5000,pretrain = pre_fit_glm)
+    t_05_d1 <-append(t_05_d1,mean(fit_result$errors[,4]))
+}
+```
+
+```{r}
+fit_tailor_d5 <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 3,  pi_u = pred_glm , t = 0.5,user_prior_density = ridge_prior)
+fit_tailor_d5_SB <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 0,  pi_u = pred_glm , t = 0.5,user_prior_density = ridge_prior)
+
+```
+```{r}
+fit_tailor_d5v <- metrop_tailor(y ~ . , data = data_train_d1, lambda = 15,  pi_u = pred_glm , t = 0.5,user_prior_density = ridge_prior)
+```
+
+
+
+```{r}
+predict_d5 <- probs.Solon(fit_tailor_d5v$chain[-c(1:(burnin + warm_up)),], simulate_D1_v2[,-61], fun = mean)
+predict_d5_SB <- probs.Solon(fit_tailor_d5_SB$chain[-c(1:(burnin + warm_up)),], simulate_D1_v2[,-61], fun = mean)
+NB_05_TB <- net_benefit_treated(predict_d5, obs_y = simulate_D1_v2[,61], risk_threshold = 0.5)
+NB_05_SB <- net_benefit_treated(predict_d5_SB, obs_y = simulate_D1_v2[,61], risk_threshold = 0.5)
+NB_05_TB
+NB_05_SB
+```
+
+
+0.1 variable selection
+```{r}
+# fit_tailor_d1$chain[2:61]
+fs1_result_90 <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d_SB$chain[,i+1], c(0.025,0.975))[['2.5%']]
+    upper_bd <-  quantile(fit_tailor_d_SB$chain[,i+1], c(0.025,0.975))[['97.5%']]
+    if (lower_bd >0 ){
+        fs1_result_90 <- append(fs1_result_90,1)
+    }
+    else{
+        fs1_result_90 <- append(fs1_result_90,0)
+    }
+}
+fs1_result_90
+fs1_result_80 <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d_SB$chain[,i+1], c(0.05,0.95))[['5%']]
+    upper_bd <-  quantile(fit_tailor_d_SB$chain[,i+1], c(0.05,0.95))[['95%']]
+    if (lower_bd >0 ){
+        fs1_result_80 <- append(fs1_result_80,1)
+    }
+    else{
+        fs1_result_80 <- append(fs1_result_80,0)
+    }
+}
+fs1_result_80
+fs1_result_50 <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d_SB$chain[,i+1], c(0.1,0.9))[['10%']]
+    upper_bd <-  quantile(fit_tailor_d_SB$chain[,i+1], c(0.1,0.9))[['90%']]
+    if (lower_bd >0 ){
+        fs1_result_50 <- append(fs1_result_50,1)
+    }
+    else{
+        fs1_result_50 <- append(fs1_result_50,0)
+    }
+}
+fs1_result_50
+```
+
+```{r}
+count(fs1_result_90[1:10]) / 10
+count(fs1_result_90[11:60]) / 50
+count(fs1_result_80[1:10]) / 10
+count(fs1_result_80[11:60]) / 50
+count(fs1_result_50[1:10]) / 10
+count(fs1_result_50[11:60]) / 50
+```
+
+```{r}
+fs1_result_90_tb <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d1$chain[,i+1], c(0.025,0.975))[['2.5%']]
+    upper_bd <-  quantile(fit_tailor_d1$chain[,i+1], c(0.025,0.975))[['97.5%']]
+    if (lower_bd >0 ){
+        fs1_result_90_tb <- append(fs1_result_90_tb,1)
+    }
+    else{
+        fs1_result_90_tb <- append(fs1_result_90_tb,0)
+    }
+}
+fs1_result_90_tb
+fs1_result_80_tb <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d1$chain[,i+1], c(0.05,0.95))[['5%']]
+    upper_bd <-  quantile(fit_tailor_d1$chain[,i+1], c(0.05,0.95))[['95%']]
+    if (lower_bd >0 ){
+        fs1_result_80_tb <- append(fs1_result_80_tb,1)
+    }
+    else{
+        fs1_result_80_tb <- append(fs1_result_80_tb,0)
+    }
+}
+fs1_result_80_tb
+fs1_result_50_tb <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d1$chain[,i+1], c(0.1,0.9))[['10%']]
+    upper_bd <-  quantile(fit_tailor_d1$chain[,i+1], c(0.1,0.9))[['90%']]
+    if (lower_bd >0 ){
+        fs1_result_50_tb <- append(fs1_result_50_tb,1)
+    }
+    else{
+        fs1_result_50_tb <- append(fs1_result_50_tb,0)
+    }
+}
+fs1_result_50_tb
+```
+
+```{r}
+count(fs1_result_90_tb[1:10]) / 10
+count(fs1_result_90_tb[11:60]) / 50
+count(fs1_result_80_tb[1:10]) / 10
+count(fs1_result_80_tb[11:60]) / 50
+count(fs1_result_50_tb[1:10]) / 10
+count(fs1_result_50_tb[11:60]) / 50
+```
+```{r}
+count(fs1_result_90[1:10]) / 10
+count(fs1_result_90[11:60]) / 50
+count(fs1_result_80[1:10]) / 10
+count(fs1_result_80[11:60]) / 50
+count(fs1_result_50[1:10]) / 10
+count(fs1_result_50[11:60]) / 50
+```
+
+```{r}
+count(fs1_result_90_tb[1:10]) / 10
+count(fs1_result_90_tb[11:60]) / 50
+count(fs1_result_80_tb[1:10]) / 10
+count(fs1_result_80_tb[11:60]) / 50
+count(fs1_result_50_tb[1:10]) / 10
+count(fs1_result_50_tb[11:60]) / 50
+```
+
+
+```{r}
+predict_d1 <- probs.Solon(fit_tailor_d1$chain[-c(1:(burnin + warm_up)),], simulate_D1_v2[,-61], fun = mean)
+predict_d_SB <- probs.Solon(fit_tailor_d1_SB$chain[-c(1:(burnin + warm_up)),], simulate_D1_v2[,-61], fun = mean)
+```
+
+```{r}
+NB_01_TB <- net_benefit_treated(predict_d1, obs_y = simulate_D1_t[,61], risk_threshold = 0.1)
+NB_01_SB <- net_benefit_treated(predict_d_SB, obs_y = simulate_D1_t[,61], risk_threshold = 0.1)
+```
+
+
+```{r}
+NB_01_TB
+NB_01_SB
+```
+
+0.3 0.5 variable selection
+```{r}
+fs3_result_90 <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d3_SB$chain[,i+1], c(0.025,0.975))[['2.5%']]
+    upper_bd <-  quantile(fit_tailor_d3_SB$chain[,i+1], c(0.025,0.975))[['97.5%']]
+    if (lower_bd >0 ){
+        fs3_result_90 <- append(fs3_result_90,1)
+    }
+    else{
+        fs3_result_90 <- append(fs3_result_90,0)
+    }
+}
+fs3_result_90
+fs3_result_80 <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d3_SB$chain[,i+1], c(0.05,0.95))[['5%']]
+    upper_bd <-  quantile(fit_tailor_d3_SB$chain[,i+1], c(0.05,0.95))[['95%']]
+    if (lower_bd >0 ){
+        fs3_result_80 <- append(fs3_result_80,1)
+    }
+    else{
+        fs3_result_80 <- append(fs3_result_80,0)
+    }
+}
+fs3_result_80
+fs3_result_50 <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d3_SB$chain[,i+1], c(0.1,0.9))[['10%']]
+    upper_bd <-  quantile(fit_tailor_d3_SB$chain[,i+1], c(0.1,0.9))[['90%']]
+    if (lower_bd >0 ){
+        fs3_result_50 <- append(fs3_result_50,1)
+    }
+    else{
+        fs3_result_50 <- append(fs3_result_50,0)
+    }
+}
+fs3_result_50
+```
+
+```{r}
+fs3_result_90_tb <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d3v2$chain[,i+1], c(0.025,0.975))[['2.5%']]
+    upper_bd <-  quantile(fit_tailor_d3v2$chain[,i+1], c(0.025,0.975))[['97.5%']]
+    if (lower_bd >0 ){
+        fs3_result_90_tb <- append(fs3_result_90_tb,1)
+    }
+    else{
+        fs3_result_90_tb <- append(fs3_result_90_tb,0)
+    }
+}
+fs3_result_90_tb
+fs3_result_80_tb <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d3v2$chain[,i+1], c(0.05,0.95))[['5%']]
+    upper_bd <-  quantile(fit_tailor_d3v2$chain[,i+1], c(0.05,0.95))[['95%']]
+    if (lower_bd >0 ){
+        fs3_result_80_tb <- append(fs3_result_80_tb,1)
+    }
+    else{
+        fs3_result_80_tb <- append(fs3_result_80_tb,0)
+    }
+}
+fs3_result_80_tb
+fs3_result_50_tb <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d3v2$chain[,i+1], c(0.1,0.9))[['10%']]
+    upper_bd <-  quantile(fit_tailor_d3v2$chain[,i+1], c(0.1,0.9))[['90%']]
+    if (lower_bd >0 ){
+        fs3_result_50_tb <- append(fs3_result_50_tb,1)
+    }
+    else{
+        fs3_result_50_tb <- append(fs3_result_50_tb,0)
+    }
+}
+fs3_result_50_tb
+```
+
+
+
+```{r}
+count(fs3_result_90[1:10]) / 10
+count(fs3_result_90[11:60]) / 50
+count(fs3_result_80[1:10]) / 10
+count(fs3_result_80[11:60]) / 50
+count(fs3_result_50[1:10]) / 10
+count(fs3_result_50[11:60]) / 50
+```
+
+```{r}
+count(fs3_result_90_tb[1:10]) / 10
+count(fs3_result_90_tb[11:60]) / 50
+count(fs3_result_80_tb[1:10]) / 10
+count(fs3_result_80_tb[11:60]) / 50
+count(fs3_result_50_tb[1:10]) / 10
+count(fs3_result_50_tb[11:60]) / 50
+```
+
+```{r}
+fs5_result_90_tb <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d5v$chain[,i+1], c(0.025,0.975))[['2.5%']]
+    upper_bd <-  quantile(fit_tailor_d5v$chain[,i+1], c(0.025,0.975))[['97.5%']]
+    if (lower_bd >0 ){
+        fs5_result_90_tb <- append(fs5_result_90_tb,1)
+    }
+    else{
+        fs5_result_90_tb <- append(fs5_result_90_tb,0)
+    }
+}
+fs5_result_90_tb
+fs5_result_80_tb <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d5v$chain[,i+1], c(0.05,0.95))[['5%']]
+    upper_bd <-  quantile(fit_tailor_d5v$chain[,i+1], c(0.05,0.95))[['95%']]
+    if (lower_bd >0 ){
+        fs5_result_80_tb <- append(fs5_result_80_tb,1)
+    }
+    else{
+        fs5_result_80_tb <- append(fs5_result_80_tb,0)
+    }
+}
+fs5_result_80_tb
+fs5_result_50_tb <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d5v$chain[,i+1], c(0.1,0.9))[['10%']]
+    upper_bd <-  quantile(fit_tailor_d5v$chain[,i+1], c(0.1,0.9))[['90%']]
+    if (lower_bd >0 ){
+        fs5_result_50_tb <- append(fs5_result_50_tb,1)
+    }
+    else{
+        fs5_result_50_tb <- append(fs5_result_50_tb,0)
+    }
+}
+fs5_result_50_tb
+```
+
+```{r}
+fs5_result_90 <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d5_SB$chain[,i+1], c(0.025,0.975))[['2.5%']]
+    upper_bd <-  quantile(fit_tailor_d5_SB$chain[,i+1], c(0.025,0.975))[['97.5%']]
+    if (lower_bd >0 ){
+        fs5_result_90 <- append(fs5_result_90,1)
+    }
+    else{
+        fs5_result_90 <- append(fs5_result_90,0)
+    }
+}
+fs5_result_90
+fs5_result_80 <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d5_SB$chain[,i+1], c(0.05,0.95))[['5%']]
+    upper_bd <-  quantile(fit_tailor_d5_SB$chain[,i+1], c(0.05,0.95))[['95%']]
+    if (lower_bd >0 ){
+        fs5_result_80 <- append(fs5_result_80,1)
+    }
+    else{
+        fs5_result_80 <- append(fs5_result_80,0)
+    }
+}
+fs5_result_80
+fs5_result_50 <- NULL
+for (i in 1: 60) {
+    lower_bd <- quantile(fit_tailor_d5_SB$chain[,i+1], c(0.1,0.9))[['10%']]
+    upper_bd <-  quantile(fit_tailor_d5_SB$chain[,i+1], c(0.1,0.9))[['90%']]
+    if (lower_bd >0 ){
+        fs5_result_50 <- append(fs5_result_50,1)
+    }
+    else{
+        fs5_result_50 <- append(fs5_result_50,0)
+    }
+}
+fs5_result_50
+```
+
+```{r}
+count(fs5_result_90[1:10]) / 10
+count(fs5_result_90[11:60]) / 50
+count(fs5_result_80[1:10]) / 10
+count(fs5_result_80[11:60]) / 50
+count(fs5_result_50[1:10]) / 10
+count(fs5_result_50[11:60]) / 50
+```
+
+
+```{r}
+count(fs5_result_90_tb[1:10]) / 10
+count(fs5_result_90_tb[11:60]) / 50
+count(fs5_result_80_tb[1:10]) / 10
+count(fs5_result_80_tb[11:60]) / 50
+count(fs5_result_50_tb[1:10]) / 10
+count(fs5_result_50_tb[11:60]) / 50
+```
+
+
+```{r}
+table_lambda  <- cbind(exp(fit_tailor_d1_SB$chain[,62]),pre_fit_01$tau2 ^ (-1))
+```
+
+```{r}
+tibble(fit_tailor_d1_SB$chain[,62])
+tibble(pre_fit_01$tau2 ^ (-1))
+```
+```{r}
+tibble(pre_fit_01$tau2 ^ (-1))
+t(as.data.frame(pre_fit_01$tau2))
+Table_lambda <- cbind(tibble(exp(fit_tailor_d1_SB$chain[,62])),tibble(t(pre_fit_01$tau2 ^(-0.5) * 2 ^(-0.5))))
+colnames(Table_lambda) <- c('tb','bayesreg')
+```
+
+```{r}
+ggplot(Table_lambda)+
+    geom_density(aes(tb),color = 'red')+
+    geom_density(aes(bayesreg),color = 'blue')
+
+```
+
+```{r}
+Table_intercept <- cbind(tibble((fit_tailor_d1_SB$chain[2001:5000,1])),tibble(t(pre_fit_01$beta0))[2001:5000,1])
+colnames(Table_intercept) <- c('tb','bayesreg')
+```
+
+
+
+
+```{r}
+dens <- apply(Table_intercept, 2, density)
+plot(NA, xlim=range(sapply(dens, "[", "x")), ylim=range(sapply(dens, "[", "y")),ylab = 'density',xlab = 'value')
+invisible(mapply(lines, dens, col=randomColor()))
+```
+
+```{r}
+set.seed(42)
+tsne <- Rtsne(simulate_D1[,-61], dims = 2, perplexity=30, verbose=TRUE, max_iter = 500)
+Label <- as.factor(simulate_D1[,61])
+colors = rainbow(length(unique(Label)))
+plot(tsne$Y, main="tsne on whole dataset(all features)",col=colors[Label],pch = 20)
+# text(tsne$Y, labels = Label_noise,col=colors[Label_noise] )
+# legend(5, -8, legend=c("CLASS 1", "CLASS 4","CLASS 2"),
+#        col=c("red", "blue",'green'), lty=1:2, cex=0.8)
+```
+```{r}
+set.seed(42)
+tsne <- Rtsne(simulate_D1_v2[,-61], dims = 2, perplexity=30, verbose=TRUE, max_iter = 500)
+Label <- as.factor(simulate_D1_v2[,61])
+colors = rainbow(length(unique(Label)))
+plot(tsne$Y, main="tsne on whole dataset(all features)",col=colors[Label],pch = 20)
+```
+
+
+```{r}
+ggplot(data.frame(x = c(0, 5)), aes(x)) +
+  stat_function(fun = ~dhalfcauchy(.x, scale = 1), n = 1e3, aes(color = "a"), size = 2) +
+  # stat_function(fun = dcauchy, n = 1e3, args = list(location = 0, scale = 1), aes(color = "b"), size = 2) +
+  # stat_function(fun = dcauchy, n = 1e3, args = list(location = 0, scale = 2), aes(color = "c"), size = 2) +
+  # stat_function(fun = dcauchy, n = 1e3, args = list(location = -2, scale = 1), aes(color = "d"), size = 2) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_color_discrete(name = "",
+                       labels = c("a" = expression(x[0] == 0*","~ gamma == 0.5)
+                                  # "b" = expression(x[0] == 0*","~ gamma == 1),
+                                  # "c" = expression(x[0] == 0*","~ gamma == 2),
+                                  # "d" = expression(x[0] == -2*","~ gamma == 1)
+                                  )) +
+  ylab("P(x)") +
+  theme_bw(base_size = 24) +
+  theme(legend.position = c(0.8, 0.8),
+        legend.text.align = 0)
+```
+
+```{r}
+result1 <- c(0.3216,0.3303,0.3052,0.2991,0.3,0.27357,0.2989,0.2723,0.2823,0.2823)
+result2 <- c(0.18125,0.16875,0.1575,0.14375,0.1375,0.08875,0.08875,0.09, 0.0625,0.0925)
+```
+
+```{r}
+data_err <- list()
+
+g <- 30 # number of files to load
+for (i in 1:g) {
+    k <- paste0("/Users/shenjia/Desktop/Mphil dissertation/results/output_sim_", i, ".RData") # specify path to the files
+    load(k)
+    data_err[[i]] <- out
+}
+
+library(plyr)
+df_analysis_res <- ldply(data_err, data.frame, .id = "Name")
+detach("package:plyr")
+```
+
+```{r}
+load(file = 'Simulate_Data.Rdata')
+```
+
+```{r}
+png(filename = 'distribution of ridge lambda.png')
+x <- rhcauchy(1e5, 1)
+hist(x, 2e5, freq = FALSE, xlim = c(-50, 50),main = 'Distribution of Ridge lambda')
+curve(dhcauchy(x, 1), 0, 50, col = "red", add = TRUE)
+dev.off()
+```
+```{r}
+png(filename =  ' distribution of log (ridge lambda).png')
+hist(log(x), 2e5, freq = FALSE, xlim = c(-50, 50))
+# curve(dhcauchy(log(x), 1), -50,0, col = "red", add = TRUE)
+dev.off()
+```
+
+```{r}
+write.csv(df_analysis_res, 'HPC_Result.csv')
+```
+
+```{r}
+df_analysis_res %>% group_by(threshold)%>% group_by(lambdas)%>% summarise(Mean_NB = mean(NB))
+```
+
+```{r}
+result_pfold <- aggregate(df_analysis_res$NB, by=list(df_analysis_res$lambdas,df_analysis_res$threshold), FUN=mean)
+colnames(result_pfold ) <- c('lambda','threshold','MeanNB')
+```
+
+```{r}
+install.packages('gghighlight')
+library(gghighlight)
+```
+
+```{r}
+result_t01 <- result_pfold[result_pfold$threshold ==0.1,]
+result_t03 <- result_pfold[result_pfold$threshold ==0.3,]
+result_t05 <- result_pfold[result_pfold$threshold ==0.5,]
+```
+
+
+```{r}
+# png(filename = '/Users/shenjia/Desktop/Mphil dissertation/5-folds average NB with different lambda value under t = 0.1 settings.png')
+options(repr.plot.width =8, repr.plot.height =6)
+p1 <- ggplot(data=result_pfold[result_pfold$threshold ==0.1,], aes(x=lambda, y = MeanNB)) +
+  geom_line(color = 'Blue') +
+  # scale_color_manual(values='Blue') + 
+  geom_point(color = 'Blue') +
+  geom_point(data = result_t01[which.max(result_t01$MeanNB),],color = 'blue',size = 5,shape =21)+
+  ggtitle('5-folds CV meanNB under t = 0.1 ')
+
+# ggsave(
+#   filename = '/Users/shenjia/Desktop/Mphil dissertation/5-folds average NB with different lambda value under t = 0.1 settings.png',p1)
+
+# png(filename = '5-folds average NB with different lambda value under t = 0.3 settings.png')
+p2 <- ggplot(data=result_pfold[result_pfold$threshold ==0.3,], aes(x=lambda, y = MeanNB)) +
+  geom_line(color = 'Red') +
+  # scale_color_manual(values='Blue') + 
+  geom_point(color = 'Red') +
+  geom_point(data = result_t03[which.max(result_t03$MeanNB),],color = 'red',size = 5,shape =21)+
+    geom_text()
+  ggtitle('5-folds CV meanNB under t = 0.3 ')
+# ggsave(filename ='5-folds average NB with different lambda value under t = 0.3 settings.png',p2 )
+
+# png(filename = '5-folds average NB with different lambda value under t = 0.5 settings.png')
+p3 <- ggplot(data=result_pfold[result_pfold$threshold ==0.5,], aes(x=lambda, y = MeanNB)) +
+  geom_line(color = 'brown') +
+  # scale_color_manual(values='Blue') + 
+  geom_point(color = 'brown') +
+  geom_point(data = result_t05[which.max(result_t05$MeanNB),],color = 'brown',size = 5,shape =21)+
+  ggtitle('5-folds CV meanNB under t = 0.5 ')
+# ggsave(filename ='5-folds average NB with different lambda value under t = 0.5 settings.png',p3 )
+```
+
+```{r}
+write.csv(result_pfold,'Result_pfold.csv')
+result_pfold[25,'MeanNB'] <- 0.2275
+```
+
+```{r}
+install.packages('arrangeGrob')
+library(arrangeGrob)
+```
+
+
+```{r}
+library(gridExtra)
+p_total <- list()
+p_total[[1]] <- p1; p_total[[2]] <- p2; p_total[[3]] <- p3; 
+p <- grid.arrange(p_total,nrow = 3)
+file4 <- grid.arrange(p1, p2, p3 , 
+             ncol = 1, nrow = 3)
+save_plot('file4.png', p, ncol = 3, base_asp = 1.1)
+options(repr.plot.width=15, repr.plot.height=8)
+ggsave(filename ='5-folds average NB with different lambda value.png',file4 ,width = 12, height = 7,dpi = 600)
+
+```
+
+```{r}
+result01 <- rbind(NB_01_SB,NB_01_TB)
+result03 <- rbind(NB_03_SB,NB_03_TB)
+result05 <- rbind(NB_05_SB,NB_05_TB)
+```
+
+```{r}
+ggplot(data=result_pfold, aes(x=lambda, y = MeanNB,group = threshold)) +
+  geom_line() +
+  # scale_color_manual(values='Blue') + 
+  geom_point() +
+  ggtitle('5-folds average NB with different lambda value under t = 0.1 settings')
+```
+```{r}
+write.csv(result01,'NB01.csv')
+write.csv(result03,'NB03.csv')
+write.csv(result05,'NB05.csv')
+```
+
+```{r}
+Rhat(cbind(fit_tailor_d1_SB$chain[40001:100000,3],fit_tailor_d1_SBv2$chain[40001:100000,3]))
+```
+```{r}
+cbind(fit_tailor_d1_SB$chain[,2],fit_tailor_d1_SBv2$chain[,2])
+```
+```{r}
+library(bayesplot)
+```
+
+```{r}
+install.packages("https://github.com/cran/coda/blob/master/R/gelman.R")
+
+```
+
+```{r}
+mcmc_trace(fit_tailor_d1_SB$chain,pars = c('var1'))
+# lines(fit_tailor_d1_SBv2$chain[40001:100000,4], col = 'blue')
+```
+```{r}
+plot(fit_tailor_d1_SB$chain[40001:100000,60])
+lines(fit_tailor_d1_SBv2$chain[40001:100000,60])
+gelman.diag(c(fit_tailor_d1_SB$chain[,62],fit_tailor_d1_SBv2$chain[,62]), confidence = 0.95, transform=FALSE, autoburnin=TRUE,multivariate=TRUE)
+gelman.plot(c(fit_tailor_d1_SB$chain[,62],fit_tailor_d1_SBv2$chain[,62]))
+library(coda)
+Gelman.Diagnostic(cbind(fit_tailor_d1_SB$chain[,62],fit_tailor_d1_SBv2$chain[,62]), confidence=0.95, transform=FALSE)
+```
+
+```{r}
+library(coda)
+# png(filename = 'traceplot_lambda.png',res = 200,width = 1200, height = 800)
+traceplot(fit_tailor_d1_SB$chain[,62],main = 'Trace plot for log(lambda)')
+# legend(90000,0.4,legend = c('1','2','3'),col = c('red','black'),cex = 0.7,lty=1)
+# dev.off()
+```
+
+```{r}
+plot(fit_tailor_d1_SB$chain[,62])
+library(coda)
+traceplot(list(fit_tailor_d1_SB$chain[,62],fit_tailor_d1_SBv2$chain[,62],fit_tailor_d_SB$chain[,62]),main = 'Trace plot for log(lambda)')
+legend(85000,0.4,legend = c('chain 1','chain 2','chain 3'),col = c('red','black','green'),cex = 0.7,lty=1, bty = 'n')
+```
+```{r}
+par(mfrow = c(2, 3))
+for (i in 1:60){
+    traceplot(list(fit_tailor_d1_SB$chain[,i+1],fit_tailor_d1_SBv2$chain[,i+1]),main = paste('coefficient', i))
+}
+par(mfrow = c(2, 3))
+traceplot(list(fit_tailor_d1_SB$chain[,62],fit_tailor_d1_SBv2$chain[,62]),main = 'Trace plot for log(lambda)')
+traceplot(list(fit_tailor_d1_SB$chain[,1],fit_tailor_d1_SBv2$chain[,1]),main = 'Trace plot for Intercept')
+par(xpd=NA)
+legend(110000,-0.15,legend = c('chain 1','chain 2'),col = c('red','black'),cex = 1.3,lty=1, bty = 'n')
+```
+

@@ -6,5 +6,5 @@ Likelihood.R: Calculate the likelihood of the Tailored Bayes
 metrop.R: Main function of the project, mcmc sampling process  
 posterior_predictive.R: Using the mcmc chain to make binary predictions  
 prior_posterior_proposal.R: Prior, posterior distribution and the proposal function  
-weights_construction.R: Construct the weight 
+weights_construction.R: Construct the weight  
 TB_template.R: The overall process of cross validation running on the HPC (because the code is too slow to run on pc)
